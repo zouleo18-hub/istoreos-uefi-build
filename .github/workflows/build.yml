@@ -44,33 +44,3 @@ jobs:
           EOS
           chmod +x files/etc/uci-defaults/99-leo-uefi-custom
           printf 'rule-providers: {}\nrules: []\n' > files/etc/openclash/custom/custom.yaml
-          sed -i 's/--enable-tui --disable-gdbtk/--disable-tui --disable-gdbtk/' toolchain/gdb/Makefile
-          make defconfig
-          sed -i 's/^CONFIG_GRUB_IMAGES=y/# CONFIG_GRUB_IMAGES is not set/' .config
-          make defconfig
-          grep -E '^CONFIG_TARGET_x86_64=|^CONFIG_PACKAGE_luci-app-openclash=|^CONFIG_PACKAGE_luci-app-passwall=' .config
-          grep -E 'GRUB_IMAGES|GRUB_EFI' .config
-      - name: Download sources
-        working-directory: openwrt
-        run: make download -j$(nproc) || make download -j1 V=s
-      - name: Compile
-        working-directory: openwrt
-        run: |
-          make -j$(nproc) || make -j1 V=s
-          ls -lh bin/targets/x86/64/
-      - name: Audit GPT/EFI + SHA256
-        working-directory: openwrt
-        run: |
-          IMG=$(ls bin/targets/x86/64/*combined-efi.img.gz | head -1); echo "IMG=$IMG"
-          gzip -dc "$IMG" > /tmp/fw.img
-          python3 -c "import sys; f=open('/tmp/fw.img','rb'); m=f.read(512); assert m[510:]==b'\x55\xaa'; print('protectiveMBR_ee:', m[450]==0xEE); f.seek(512); print('GPT_EFI_PART:', f.read(8)==b'EFI PART')"
-          sha256sum bin/targets/x86/64/*combined-efi.img.gz
-      - name: Upload firmware artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: istoreos-x86_64-uefi-openclash-passwall
-          path: |
-            openwrt/bin/targets/x86/64/*combined-efi.img.gz
-            openwrt/bin/targets/x86/64/*.manifest
-            openwrt/bin/targets/x86/64/config.buildinfo
-          retention-days: 14
